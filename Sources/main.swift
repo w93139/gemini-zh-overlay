@@ -63,6 +63,7 @@ struct Label: Equatable {
     var instance: String? = nil
     var translation: String? = nil
     var centered = false
+    var onAccent = false
     var id: String { instance ?? key }
     var displayed: String { translation ?? translations[key] ?? key }
 }
@@ -167,7 +168,8 @@ final class Surface: NSView {
     override func draw(_ dirtyRect: NSRect) {
         guard let label else { return }
         let text = label.displayed
-        NSColor(deviceWhite:label.background / 255, alpha:1).setFill()
+        let background = label.onAccent ? NSColor(srgbRed:0, green:122/255, blue:204/255, alpha:1) : NSColor(deviceWhite:label.background / 255, alpha:1)
+        background.setFill()
         bounds.fill()
         let attributes: [NSAttributedString.Key:Any] = [
             .font: NSFont.systemFont(ofSize:label.fontSize, weight:label.bold ? .semibold : .regular),

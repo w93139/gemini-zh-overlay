@@ -95,10 +95,33 @@ func settingsLabels(in web: AXUIElement, viewport: CGRect, url: URL) -> [Label] 
             guard visible.width >= 15, visible.height >= 11 else { return }
             result.append(Label(key:text,rect:visible,fontSize:size,bold:isHeading,
                 background:bg,foreground:isHeading || !isText || size >= 14 ? 207 : 155,
-                instance:id,translation:zh,centered:!isText && !inNav))
+                instance:id,translation:zh,centered:(!isText && !inNav) || (parentRole == "AXLink" && text == "Upgrade"),
+                onAccent:parentRole == "AXLink" && text == "Upgrade"))
             return
         }
-        for (index,child) in nodes(e).enumerated() {
+        let children = nodes(e)
+        // WebKit reports one bounding rectangle for wrapped text following an inline
+        // link. Its first line starts after the link, but the later lines start at
+        // the paragraph edge. Cover the two runs separately to preserve the link.
+        var inlineLink: CGRect?
+        for (index,child) in children.enumerated() {
+            let childRole = string(child,"AXRole")
+            if childRole == "AXStaticText", let link = inlineLink, let box = bounds(child),
+               box.minX < link.maxX, abs(box.minY-link.minY) < 4,
+               box.height > link.height + 6, let zh = translate(name(child)) {
+                let top = CGRect(x:link.maxX+1,y:box.minY,width:max(0,box.maxX-link.maxX-1),height:link.height)
+                let next = CGRect(x:box.minX,y:top.maxY,width:box.width,height:box.maxY-top.maxY)
+                for (part, text, suffix) in [(top,"","first"),(next,zh,"next")] {
+                    let visible = part.intersection(clip)
+                    if visible.width > 2 && visible.height >= 10 {
+                        result.append(Label(key:"inline",rect:visible,fontSize:12,bold:false,
+                            background:16,foreground:155,instance:"\(id)/\(index)/\(suffix)",translation:text))
+                    }
+                }
+                inlineLink = nil
+                continue
+            }
+            inlineLink = childRole == "AXLink" ? bounds(child) : nil
             let childClip = role == "AXScrollArea" ? clip.intersection(r) : clip
             walk(child,id:"\(id)/\(index)",parentRole:role,parentFrame:r,clip:childClip,depth:depth+1)
         }
